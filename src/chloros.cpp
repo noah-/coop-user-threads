@@ -55,13 +55,26 @@ Thread::Thread(bool create_stack)
     : id{0}, state{State::kWaiting}, context{}, stack{nullptr} {
   // FIXME: Phase 1
   static_cast<void>(create_stack);
+
+  if (create_stack)
+    stack = static_cast<uint8_t *>(malloc(kStackSize));
+
+  id = next_id++;
   // These two initial values are provided for you.
   context.mxcsr = 0x1F80;
   context.x87 = 0x037F;
+  context.rbp = 0;
+  context.rbx = 0;
+  context.r12 = 0;
+  context.r13 = 0;
+  context.r14 = 0;
+  context.r15 = 0;
+  context.rsp = reinterpret_cast<uint64_t>(&stack[kStackSize - 1]);
 }
 
 Thread::~Thread() {
   // FIXME: Phase 1
+  free(stack);
 }
 
 void Thread::PrintDebug() {
