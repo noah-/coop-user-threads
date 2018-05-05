@@ -54,8 +54,6 @@ std::atomic<uint64_t> Thread::next_id;
 Thread::Thread(bool create_stack)
     : id{0}, state{State::kWaiting}, context{}, stack{nullptr} {
   // FIXME: Phase 1
-  static_cast<void>(create_stack);
-
   if (create_stack)
     stack = static_cast<uint8_t *>(malloc(kStackSize));
 
@@ -129,7 +127,16 @@ bool Yield(bool only_ready) {
   // in `kReady` state. Otherwise, also consider `kWaiting` threads. Be careful,
   // never schedule initial thread onto other kernel threads (for extra credit
   // phase)!
-  static_cast<void>(only_ready);
+  current_thread->state = Thread::State::kReady;
+  thread_queue->push_back(current_thread);
+
+  for (auto&& thread : thread_queue) {
+    if (thread->state == Thread::State::kReady || !only_ready) {
+      current_thread = std::move(thread);
+      break;
+    }
+  }
+
   return true;
 }
 
