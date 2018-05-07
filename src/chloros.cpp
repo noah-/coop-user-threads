@@ -68,7 +68,7 @@ Thread::Thread(bool create_stack)
 
   if (create_stack) {
     stack = static_cast<uint8_t *>(malloc(kStackSize));
-    context.rsp = reinterpret_cast<uint64_t>(stack);
+    context.rsp = reinterpret_cast<uint64_t>(&stack[kStackSize-1]);
   }
 }
 
@@ -121,8 +121,10 @@ void Spawn(Function fn, void* arg) {
   // afterwards. How do we make sure it's executed right away?
   new_thread->state = Thread::State::kReady;
   *(uint64_t*)(new_thread->context.rsp) = reinterpret_cast<uint64_t>(arg);
-  new_thread->context.rsp += sizeof(uint64_t*);
+  new_thread->context.rsp -= sizeof(uint64_t*);
   *(Function*)(new_thread->context.rsp) = fn;
+  new_thread->context.rsp -= sizeof(Function*);
+  *(uint64_t*)(new_thread->context.rsp) = reinterpret_cast<uint64_t>(StartThread);
   thread_queue.insert(thread_queue.begin(), std::move(new_thread));
   Yield(true);
 }
@@ -156,11 +158,8 @@ bool Yield(bool only_ready) {
   if (!next_thread)
     return false;
 
-
   current_thread = std::move(next_thread);
-  ContextSwitch(old_context, &current_thread.get()->context); 
-  StartThread(reinterpret_cast<void*>(current_thread->context.rsp));
-
+  ContextSwitch(old_context, &current_thread.get()->context);
   return true;
 }
 
