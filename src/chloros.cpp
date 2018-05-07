@@ -67,7 +67,12 @@ Thread::Thread(bool create_stack)
   context.r13 = 0;
   context.r14 = 0;
   context.r15 = 0;
-  context.rsp = reinterpret_cast<uint64_t>(&stack[kStackSize - 1]);
+  context.rsp = 0;
+
+  if (create_stack) {
+    stack = static_cast<uint8_t *>(malloc(kStackSize));
+    context.rsp = reinterpret_cast<uint64_t>(&stack[kStackSize - 1]);
+  }
 }
 
 Thread::~Thread() {
@@ -121,9 +126,9 @@ void Spawn(Function fn, void* arg) {
   static_cast<void>(arg);
   new_thread->state = Thread::State::kReady;
   *(uint64_t*)(new_thread->context.rsp) = reinterpret_cast<uint64_t>(arg);
-  new_thread->context.rsp += 8;
-  *(uint64_t*)(new_thread->context.rsp) = reinterpret_cast<uint64_t>(fn);
-  thread_queue.insert(thread_queue.begin(), new_thread);
+  new_thread->context.rsp += sizeof(uint64_t*);
+  *(Function*)(new_thread->context.rsp) = fn;
+  thread_queue.insert(thread_queue.begin(), std::move(new_thread));
   Yield(true);
 }
 
@@ -133,25 +138,25 @@ bool Yield(bool only_ready) {
   // in `kReady` state. Otherwise, also consider `kWaiting` threads. Be careful,
   // never schedule initial thread onto other kernel threads (for extra credit
   // phase)!
-  /*if (current_thread->state == Thread::State::kRunning)
+  if (current_thread->state == Thread::State::kRunning)
     current_thread->state = Thread::State::kReady;
 
-  thread_queue.push_back(current_thread);
+  thread_queue.push_back(std::move(current_thread));
 
   for (auto it = thread_queue.begin(); it != thread_queue.end();) {
     if ((**it).state == Thread::State::kReady || !only_ready) {
-      //current_thread = std::move(*it);
-      //thread_queue.erase(it);
+      current_thread = std::move(*it);
+      thread_queue.erase(it);
       break;
     } else {
       ++it;
     }
   }
 
-  Function fn = reinterpret_cast<Function>(current_thread->context.rsp);
-  void* arg = reinterpret_cast<void*>(current_thread->context.rsp-8);
+  Function fn = *reinterpret_cast<Function*>(current_thread->context.rsp);
+  void* arg = *reinterpret_cast<uint64_t**>(current_thread->context.rsp-sizeof(Function));
   ThreadEntry(fn, arg);
- */
+ 
   return true;
 }
 
