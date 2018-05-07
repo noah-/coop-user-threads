@@ -119,8 +119,19 @@ void Spawn(Function fn, void* arg) {
   // FIXME: Phase 3
   // Set up the initial stack, and put it in `thread_queue`. Must yield to it
   // afterwards. How do we make sure it's executed right away?
-  static_cast<void>(fn);
-  static_cast<void>(arg);
+  // new_thread.get()->stack[kStackSize - 1] = static_cast<void>(fn);
+  // new_thread.get()->stack[kStackSize - 2] = static_cast<void>(arg);
+  // new_thread.get()->state = kReady;
+  // queue_lock.lock();
+  // thread_queue.insert(thread_queue.begin(), std::move(new_thread));
+  // queue_lock.unlock(); // Unlock in Yield() to make sure it's the yield-to thread?
+
+  new_thread.get()->state = Thread::State::kReady;
+  *(uint64_t*)(new_thread.get()->context.rsp) = reinterpret_cast<uint64_t>(arg);
+  new_thread.get()->context.rsp += 8;
+  *(uint64_t*)(new_thread.get()->context.rsp) = reinterpret_cast<uint64_t>(fn);
+  thread_queue.insert(thread_queue.begin(), std::move(new_thread));
+  Yield(true);
 }
 
 bool Yield(bool only_ready) {
@@ -131,15 +142,18 @@ bool Yield(bool only_ready) {
   // phase)!
   static_cast<void>(only_ready);
 
+  chloros::Context *old_context = nullptr, *new_context = nullptr;
+
   queue_lock.lock();
   auto next_thread = thread_queue.begin();
   for (; next_thread != thread_queue.end(); ++next_thread) {
     if (only_ready) {
-      if (next_thread->get()->state == kReady) {
+      if (next_thread->get()->state == Thread::State::kReady) {
         break;
       }
     } else {
-      if (next_thread->get()->state == kReady || next_thread->get()->state == kWaiting) {
+      if (next_thread->get()->state == Thread::State::kReady ||
+          next_thread->get()->state == Thread::State::kWaiting) {
         break;
       }
     }
@@ -147,11 +161,18 @@ bool Yield(bool only_ready) {
 
   // switch to next_thread if it's found
   if (next_thread != thread_queue.end()) {
-    current_thread.get()->state = kReady;
-    
-  }
-  queue_lock.unlock();
+    old_context = &(current_thread.get()->context);
+    current_thread.get()->state = Thread::State::kReady;
+    thread_queue.push_back(std::move(current_thread));
+    current_thread.reset();
 
+    current_thread = std::move(*next_thread);
+    new_context = &(next_thread->get()->context);
+    thread_queue.erase(next_thread);
+  }
+
+  queue_lock.unlock();
+  ContextSwitch(old_context, new_context);
   return true;
 }
 
