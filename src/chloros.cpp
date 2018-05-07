@@ -141,10 +141,12 @@ bool Yield(bool only_ready) {
   if (current_thread->state == Thread::State::kRunning)
     current_thread->state = Thread::State::kReady;
 
+  Context* old = &current_thread->context;
   thread_queue.push_back(std::move(current_thread));
 
   for (auto it = thread_queue.begin(); it != thread_queue.end();) {
-    if ((**it).state == Thread::State::kReady || !only_ready) {
+    if ((**it).state == Thread::State::kReady || (!only_ready && (**it).state == Thread::State::kWaiting)) {
+      ContextSwitch(old, &(**it).context);
       current_thread = std::move(*it);
       thread_queue.erase(it);
       break;
@@ -153,10 +155,7 @@ bool Yield(bool only_ready) {
     }
   }
 
-  Function fn = *reinterpret_cast<Function*>(current_thread->context.rsp);
-  void* arg = *reinterpret_cast<uint64_t**>(current_thread->context.rsp-sizeof(Function));
-  ThreadEntry(fn, arg);
- 
+  StartThread(reinterpret_cast<void*>(current_thread->context.rsp));
   return true;
 }
 
