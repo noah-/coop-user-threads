@@ -57,13 +57,13 @@ Thread::Thread(bool create_stack)
   static_cast<void>(create_stack);
 
   if (create_stack)
-    stack = static_cast<uint8_t *>(malloc(kStackSize));
+    stack = new uint8_t[kStackSize];
 
   id = next_id++;
   // These two initial values are provided for you.
   context.mxcsr = 0x1F80;
   context.x87 = 0x037F;
-  context.rbp = 0;
+  context.rbp = reinterpret_cast<uint64_t>(&stack[kStackSize - 1]);
   context.rbx = 0;
   context.r12 = 0;
   context.r13 = 0;
@@ -74,7 +74,7 @@ Thread::Thread(bool create_stack)
 
 Thread::~Thread() {
   // FIXME: Phase 1
-  free(stack);
+  delete[] stack;
 }
 
 void Thread::PrintDebug() {
@@ -119,8 +119,15 @@ void Spawn(Function fn, void* arg) {
   // FIXME: Phase 3
   // Set up the initial stack, and put it in `thread_queue`. Must yield to it
   // afterwards. How do we make sure it's executed right away?
-  static_cast<void>(fn);
-  static_cast<void>(arg);
+
+  new_thread.get()->state = Thread::State::kReady;
+  *(uint64_t*)(new_thread.get()->context.rsp) = reinterpret_cast<uint64_t>(arg);
+  new_thread.get()->context.rsp -= 8;
+  *(uint64_t*)(new_thread.get()->context.rsp) = reinterpret_cast<uint64_t>(fn);
+  new_thread.get()->context.rsp -= 8;
+  *(uint64_t*)(new_thread.get()->context.rsp) = reinterpret_cast<uint64_t>(StartThread);
+  thread_queue.insert(thread_queue.begin(), std::move(new_thread));
+  Yield(true);
 }
 
 bool Yield(bool only_ready) {
@@ -130,7 +137,33 @@ bool Yield(bool only_ready) {
   // never schedule initial thread onto other kernel threads (for extra credit
   // phase)!
   static_cast<void>(only_ready);
-  return true;
+  chloros::Context *old_context = nullptr, *new_context = nullptr;
+
+  queue_lock.lock();
+  for (auto it = thread_queue.begin(); it != thread_queue.end(); ++it) {
+    if ((*it).get()->state == Thread::State::kReady ||
+        (!only_ready && ((*it).get()->state == Thread::State::kWaiting))) {
+      std::unique_ptr<Thread> yield_to_thread = std::move(*it);
+      thread_queue.erase(it);
+      yield_to_thread.get()->state = Thread::State::kRunning;
+      new_context = &(yield_to_thread.get()->context);
+
+      if (current_thread.get()->state == Thread::State::kRunning) {
+        current_thread.get()->state = Thread::State::kReady;
+      }
+      old_context = &(current_thread.get()->context);
+      thread_queue.push_back(std::move(current_thread));
+      current_thread = std::move(yield_to_thread);
+
+      queue_lock.unlock();      
+      ContextSwitch(old_context, new_context);
+      GarbageCollect();
+      return true;
+    }
+  }
+
+  queue_lock.unlock();
+  return false;
 }
 
 void Wait() {
@@ -141,7 +174,17 @@ void Wait() {
 }
 
 void GarbageCollect() {
-  // FIXME: Phase 4
+  queue_lock.lock();
+  std::vector<std::unique_ptr<Thread>> new_thread_queue{};
+  for (uint i = 0; i < thread_queue.size(); i++) {
+    if (thread_queue[i].get()->state != Thread::State::kZombie) {
+      new_thread_queue.push_back(std::move(thread_queue[i]));
+      thread_queue[i].reset();
+    }
+  }
+  swap(new_thread_queue, thread_queue);
+  new_thread_queue.clear();
+  queue_lock.unlock();
 }
 
 std::pair<int, int> GetThreadCount() {
