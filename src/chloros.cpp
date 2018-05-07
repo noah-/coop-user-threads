@@ -54,9 +54,6 @@ std::atomic<uint64_t> Thread::next_id;
 Thread::Thread(bool create_stack)
     : id{0}, state{State::kWaiting}, context{}, stack{nullptr} {
   // FIXME: Phase 1
-  if (create_stack)
-    stack = static_cast<uint8_t *>(malloc(kStackSize));
-
   id = next_id++;
   // These two initial values are provided for you.
   context.mxcsr = 0x1F80;
@@ -71,7 +68,7 @@ Thread::Thread(bool create_stack)
 
   if (create_stack) {
     stack = static_cast<uint8_t *>(malloc(kStackSize));
-    context.rsp = reinterpret_cast<uint64_t>(&stack[kStackSize - 1]);
+    context.rsp = reinterpret_cast<uint64_t>(stack);
   }
 }
 
@@ -122,8 +119,6 @@ void Spawn(Function fn, void* arg) {
   // FIXME: Phase 3
   // Set up the initial stack, and put it in `thread_queue`. Must yield to it
   // afterwards. How do we make sure it's executed right away?
-  static_cast<void>(fn);
-  static_cast<void>(arg);
   new_thread->state = Thread::State::kReady;
   *(uint64_t*)(new_thread->context.rsp) = reinterpret_cast<uint64_t>(arg);
   new_thread->context.rsp += sizeof(uint64_t*);
@@ -138,24 +133,34 @@ bool Yield(bool only_ready) {
   // in `kReady` state. Otherwise, also consider `kWaiting` threads. Be careful,
   // never schedule initial thread onto other kernel threads (for extra credit
   // phase)!
-  if (current_thread->state == Thread::State::kRunning)
-    current_thread->state = Thread::State::kReady;
+  Context* old_context = &current_thread->context;
+  auto next_thread = std::unique_ptr<Thread>{nullptr};
 
-  Context* old = &current_thread->context;
-  thread_queue.push_back(std::move(current_thread));
+  queue_lock.lock(); // Start Exclusive Section
 
-  for (auto it = thread_queue.begin(); it != thread_queue.end();) {
-    if ((**it).state == Thread::State::kReady || (!only_ready && (**it).state == Thread::State::kWaiting)) {
-      ContextSwitch(old, &(**it).context);
-      current_thread = std::move(*it);
+  for (auto it = thread_queue.begin(); it != thread_queue.end(); ++it) {
+    if (it->get()->state == Thread::State::kReady || (!only_ready && it->get()->state == Thread::State::kWaiting)) {
+      next_thread = std::move(*it);
       thread_queue.erase(it);
+      
+      if (current_thread->state == Thread::State::kRunning)
+        current_thread->state = Thread::State::kReady;
+      
+      thread_queue.push_back(std::move(current_thread));
       break;
-    } else {
-      ++it;
     }
   }
 
+  queue_lock.unlock(); // End Exclusive Section
+
+  if (!next_thread)
+    return false;
+
+
+  current_thread = std::move(next_thread);
+  ContextSwitch(old_context, &current_thread.get()->context); 
   StartThread(reinterpret_cast<void*>(current_thread->context.rsp));
+
   return true;
 }
 
