@@ -130,6 +130,28 @@ bool Yield(bool only_ready) {
   // never schedule initial thread onto other kernel threads (for extra credit
   // phase)!
   static_cast<void>(only_ready);
+
+  queue_lock.lock();
+  auto next_thread = thread_queue.begin();
+  for (; next_thread != thread_queue.end(); ++next_thread) {
+    if (only_ready) {
+      if (next_thread->get()->state == kReady) {
+        break;
+      }
+    } else {
+      if (next_thread->get()->state == kReady || next_thread->get()->state == kWaiting) {
+        break;
+      }
+    }
+  }
+
+  // switch to next_thread if it's found
+  if (next_thread != thread_queue.end()) {
+    current_thread.get()->state = kReady;
+    
+  }
+  queue_lock.unlock();
+
   return true;
 }
 
