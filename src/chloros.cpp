@@ -57,7 +57,7 @@ Thread::Thread(bool create_stack)
   static_cast<void>(create_stack);
 
   if (create_stack)
-    stack = static_cast<uint8_t *>(malloc(kStackSize));
+    stack = new uint8_t[kStackSize];
 
   id = next_id++;
   // These two initial values are provided for you.
@@ -74,7 +74,7 @@ Thread::Thread(bool create_stack)
 
 Thread::~Thread() {
   // FIXME: Phase 1
-  free(stack);
+  delete[] stack;
 }
 
 void Thread::PrintDebug() {
@@ -137,7 +137,6 @@ bool Yield(bool only_ready) {
   // never schedule initial thread onto other kernel threads (for extra credit
   // phase)!
   static_cast<void>(only_ready);
-
   chloros::Context *old_context = nullptr, *new_context = nullptr;
 
   queue_lock.lock();
@@ -158,6 +157,7 @@ bool Yield(bool only_ready) {
 
       queue_lock.unlock();      
       ContextSwitch(old_context, new_context);
+      GarbageCollect();
       return true;
     }
   }
@@ -174,7 +174,17 @@ void Wait() {
 }
 
 void GarbageCollect() {
-  // FIXME: Phase 4
+  queue_lock.lock();
+  std::vector<std::unique_ptr<Thread>> new_thread_queue{};
+  for (uint i = 0; i < thread_queue.size(); i++) {
+    if (thread_queue[i].get()->state != Thread::State::kZombie) {
+      new_thread_queue.push_back(std::move(thread_queue[i]));
+      thread_queue[i].reset();
+    }
+  }
+  swap(new_thread_queue, thread_queue);
+  new_thread_queue.clear();
+  queue_lock.unlock();
 }
 
 std::pair<int, int> GetThreadCount() {
