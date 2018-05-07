@@ -126,7 +126,6 @@ void Spawn(Function fn, void* arg) {
   *(uint64_t*)(new_thread.get()->context.rsp) = reinterpret_cast<uint64_t>(fn);
   new_thread.get()->context.rsp -= 8;
   *(uint64_t*)(new_thread.get()->context.rsp) = reinterpret_cast<uint64_t>(StartThread);
-  //new_thread.get()->context.rsp -= 8;
   thread_queue.insert(thread_queue.begin(), std::move(new_thread));
   Yield(true);
 }
