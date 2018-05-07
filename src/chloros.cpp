@@ -119,6 +119,12 @@ void Spawn(Function fn, void* arg) {
   // afterwards. How do we make sure it's executed right away?
   static_cast<void>(fn);
   static_cast<void>(arg);
+  new_thread.state = Thread::State::kReady;
+  *(new_thread.context.rsp) = arg;
+  new_thread.context.rsp += 8;
+  *(new_thread.context.rsp) = fn;
+  thread_queue->insert(thread_queue->begin(), new_thread);
+  Yield(true);
 }
 
 bool Yield(bool only_ready) {
@@ -127,15 +133,20 @@ bool Yield(bool only_ready) {
   // in `kReady` state. Otherwise, also consider `kWaiting` threads. Be careful,
   // never schedule initial thread onto other kernel threads (for extra credit
   // phase)!
-  current_thread->state = Thread::State::kReady;
+  if (current_thread->state == Thread::State::kRunning)
+    current_thread->state = Thread::State::kReady;
+
   thread_queue->push_back(current_thread);
 
   for (auto&& thread : thread_queue) {
     if (thread->state == Thread::State::kReady || !only_ready) {
       current_thread = std::move(thread);
+      thread_queue->erase(thread);
       break;
     }
   }
+
+  StartThread(current_thread);
 
   return true;
 }
