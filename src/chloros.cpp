@@ -172,8 +172,11 @@ bool Yield(bool only_ready) {
   }
 
   queue_lock.unlock();
-  ContextSwitch(old_context, new_context);
-  return true;
+  if (old_context && new_context) {
+    ContextSwitch(old_context, new_context);
+    return true;
+  }
+  return false;
 }
 
 void Wait() {
