@@ -119,7 +119,13 @@ void Spawn(Function fn, void* arg) {
   *(Function*)(new_thread->context.rsp) = fn;
   new_thread->context.rsp -= sizeof(Function*);
   *(uint64_t*)(new_thread->context.rsp) = reinterpret_cast<uint64_t>(StartThread);
+
+  queue_lock.lock(); // Start Exclusive Section
+
   thread_queue.insert(thread_queue.begin(), std::move(new_thread));
+
+  queue_lock.unlock(); // End Exclusive Section
+
   Yield(true);
 }
 
