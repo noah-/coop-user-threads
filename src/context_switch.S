@@ -20,10 +20,6 @@ context_switch:
 
   ldmxcsr 0x38(%rsi)
   fldcw   0x3C(%rsi)
-  /* FIXME: Phase 2
-   * Save and restore execution context.
-   * Part of the code is provided.
-   */
 
   movq %r15, 8(%rdi)
   movq %r14, 16(%rdi)
@@ -39,7 +35,8 @@ context_switch:
   movq 32(%rsi), %r12
   movq 40(%rsi), %rbx
   movq 48(%rsi), %rbp
-  ret
+
+  jmp queue_unlock
 
 /**
  * Initial function implicitly executed by a thread.

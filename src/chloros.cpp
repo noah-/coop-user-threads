@@ -130,10 +130,10 @@ void Spawn(Function fn, void* arg) {
 }
 
 bool Yield(bool only_ready) {
+  queue_lock.lock(); // Start Exclusive Section
+
   Context* old_context = &current_thread->context;
   auto next_thread = std::unique_ptr<Thread>{nullptr};
-
-  queue_lock.lock(); // Start Exclusive Section
 
   for (auto it = thread_queue.begin(); it != thread_queue.end(); ++it) {
     if (it->get()->state == Thread::State::kReady || (!only_ready && it->get()->state == Thread::State::kWaiting)) {
@@ -148,13 +148,14 @@ bool Yield(bool only_ready) {
     }
   }
 
-  queue_lock.unlock(); // End Exclusive Section
-
-  if (!next_thread)
+  if (!next_thread) {
+    queue_lock.unlock(); // End Exclusive Section
     return false;
+  }
 
   current_thread = std::move(next_thread);
-  ContextSwitch(old_context, &current_thread.get()->context);
+  ContextSwitch(old_context, &current_thread.get()->context); // End Exclusive Section
+
   GarbageCollect();
   return true;
 }
@@ -206,6 +207,10 @@ void ThreadEntry(Function fn, void* arg) {
   chloros::Yield();
   // Unreachable here. Why?
   ASSERT(false);
+}
+
+void QueueUnlock() {
+  queue_lock.unlock();
 }
 
 }  // namespace chloros

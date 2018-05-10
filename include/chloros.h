@@ -108,6 +108,10 @@ extern "C" {
 // assembly function `start_thread`, which will fetch the arguments on stack and
 // put them in the correct registers.
 void ThreadEntry(Function fn, void* arg) __asm__("thread_entry");
+
+// Expose queue_lock.unlock() to assembly function 'context_switch' which will
+// hold the schedule lock until a context switch is complete.
+void QueueUnlock() __asm__("queue_unlock");
 }
 
 }  // namespace chloros
