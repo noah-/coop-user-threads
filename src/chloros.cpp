@@ -67,6 +67,7 @@ Thread::Thread(bool create_stack)
   if (create_stack) {
     stack = static_cast<uint8_t*>(malloc(kStackSize));
     context.rsp = reinterpret_cast<uint64_t>(stack) + kStackSize;
+    context.rbp = context.rsp;
   }
 }
 
