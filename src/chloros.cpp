@@ -66,7 +66,7 @@ Thread::Thread(bool create_stack)
 
   if (create_stack) {
     stack = static_cast<uint8_t*>(malloc(kStackSize));
-    context.rsp = reinterpret_cast<uint64_t>(&stack[kStackSize-1]);
+    context.rsp = reinterpret_cast<uint64_t>(stack) + kStackSize;
   }
 }
 
@@ -114,10 +114,11 @@ void Initialize() {
 void Spawn(Function fn, void* arg) {
   auto new_thread = std::make_unique<Thread>(true);
   new_thread->state = Thread::State::kReady;
-  *(uint64_t*)(new_thread->context.rsp) = reinterpret_cast<uint64_t>(arg);
   new_thread->context.rsp -= sizeof(uint64_t*);
-  *(Function*)(new_thread->context.rsp) = fn;
+  *(uint64_t*)(new_thread->context.rsp) = reinterpret_cast<uint64_t>(arg);
   new_thread->context.rsp -= sizeof(Function*);
+  *(Function*)(new_thread->context.rsp) = fn;
+  new_thread->context.rsp -= sizeof(uint64_t*);
   *(uint64_t*)(new_thread->context.rsp) = reinterpret_cast<uint64_t>(StartThread);
 
   queue_lock.lock(); // Start Exclusive Section
