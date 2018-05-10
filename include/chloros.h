@@ -79,7 +79,7 @@ void Initialize();
 
 // Create a new green thread and execute function inside it. After allocating
 // and initializing the thread, current thread must yield execution to it.
-void Spawn(Function fn, void* arg);
+void Spawn(Function fn, void* arg, void* status = nullptr);
 
 // Yield execution. Make sure it behaves like a round-robin scheduler! Returns
 // whether the action was successful. If there are no other thread to yield to,
@@ -107,7 +107,7 @@ extern "C" {
 // Entry function for threads that are spawn. This will be called by the
 // assembly function `start_thread`, which will fetch the arguments on stack and
 // put them in the correct registers.
-void ThreadEntry(Function fn, void* arg) __asm__("thread_entry");
+void ThreadEntry(Function fn, void* arg, void* status) __asm__("thread_entry");
 
 // Expose queue_lock.unlock() to assembly function 'context_switch' which will
 // hold the schedule lock until a context switch is complete.

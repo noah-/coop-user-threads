@@ -53,5 +53,6 @@ start_thread:
   movq    %rsp, %rbp
   movq    0x8(%rbp), %rdi
   movq    0x10(%rbp), %rsi
+  movq    0x18(%rbp), %rdx
   callq   thread_entry
   hlt

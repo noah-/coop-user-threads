@@ -112,9 +112,11 @@ void Initialize() {
   current_thread = std::move(new_thread);
 }
 
-void Spawn(Function fn, void* arg) {
+void Spawn(Function fn, void* arg, void* status) {
   auto new_thread = std::make_unique<Thread>(true);
   new_thread->state = Thread::State::kReady;
+  new_thread->context.rsp -= sizeof(uint64_t*);
+  *(uint64_t*)(new_thread->context.rsp) = reinterpret_cast<uint64_t>(status);  
   new_thread->context.rsp -= sizeof(uint64_t*);
   *(uint64_t*)(new_thread->context.rsp) = reinterpret_cast<uint64_t>(arg);
   new_thread->context.rsp -= sizeof(Function*);
@@ -201,8 +203,10 @@ std::pair<int, int> GetThreadCount() {
   return {ready, zombie};
 }
 
-void ThreadEntry(Function fn, void* arg) {
+void ThreadEntry(Function fn, void* arg, void* status) {
   fn(arg);
+  if (status)
+    *(uint64_t*)(status) = 1;
   current_thread->state = Thread::State::kZombie;
   LOG_DEBUG("Thread %" PRId64 " exiting.", current_thread->id);
   // A thread that is spawn will always die yielding control to other threads.
