@@ -138,7 +138,11 @@ bool Yield(bool only_ready) {
   auto next_thread = std::unique_ptr<Thread>{nullptr};
 
   for (auto it = thread_queue.begin(); it != thread_queue.end(); ++it) {
-    if (it->get()->state == Thread::State::kReady || (!only_ready && it->get()->state == Thread::State::kWaiting)) {
+    if (!it->get()->stack && it->get()->id != initial_thread_id) {
+      continue;
+    }
+    if (it->get()->state == Thread::State::kReady ||
+        (!only_ready && it->get()->state == Thread::State::kWaiting)) {
       next_thread = std::move(*it);
       thread_queue.erase(it);
 
