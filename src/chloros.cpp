@@ -8,6 +8,7 @@
 #include <mutex>
 #include <queue>
 #include <vector>
+#include <thread>
 #include "common.h"
 
 extern "C" {
@@ -112,6 +113,17 @@ void Initialize() {
   current_thread = std::move(new_thread);
 }
 
+void CreateAsyncTask(Function fn, void* arg, void* status) {
+  std::thread t(SpawnAsync, fn, arg, status);
+  t.detach();
+}
+
+void SpawnAsync(Function fn, void* arg, void* status) {
+  chloros::Initialize();
+  chloros::Spawn(fn, arg, status);
+  chloros::Wait();
+}
+
 void Spawn(Function fn, void* arg, void* status) {
   auto new_thread = std::make_unique<Thread>(true);
   new_thread->state = Thread::State::kReady;
@@ -127,9 +139,6 @@ void Spawn(Function fn, void* arg, void* status) {
   queue_lock.lock(); // Start Exclusive Section
 
   thread_queue.insert(thread_queue.begin(), std::move(new_thread));
-
-//  queue_lock.unlock(); // End Exclusive Section
-
   Yield(true, true);
 }
 

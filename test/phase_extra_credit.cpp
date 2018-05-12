@@ -7,28 +7,30 @@ constexpr int const kKernelThreads = 25;
 
 void AsyncTask(void *arg)
 {
-  printf("I won't block! %d\n", *(int*)arg);
+  int t = *(int*)arg;
+  printf("I won't block! %d\n", t);
   std::this_thread::sleep_for(std::chrono::milliseconds(200));
-  printf("I'm done! %d\n", *(int*)arg);
+  printf("I'm done! %d\n", t);
 }
 
 void GreenThreadAsyncTest(void *arg) {
   int status = 0;
   int count = 0;
-  chloros::Spawn(AsyncTask, arg, &status);
+  int thread = *(int*)arg;
+  chloros::CreateAsyncTask(AsyncTask, arg, &status);
   
-  printf("Async Task Started %d\n", *(int*)arg);
+  printf("Async Task Started %d\n", thread);
 
   while (status != 1) {
     count++;
     if (count%100 == 0) {
       count = 1;
-      printf("Not Blocked %d\n", *(int*)arg);
+      printf("Not Blocked %d\n", thread);
     }
     chloros::Yield();
   }
   
-  printf("Async Task Done! %d\n", *(int*)arg);
+  printf("Async Task Done! %d\n", thread);
 }
 
 void GreenThreadWorker(void*) { printf("Green thread on kernel thread.\n"); }

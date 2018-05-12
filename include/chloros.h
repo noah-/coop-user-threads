@@ -77,6 +77,10 @@ using Function = std::add_pointer<void(void*)>::type;
 // extra credit phase)?
 void Initialize();
 
+
+void SpawnAsync(Function fn, void* arg, void* status);
+void CreateAsyncTask(Function fn, void* arg, void* status);
+
 // Create a new green thread and execute function inside it. After allocating
 // and initializing the thread, current thread must yield execution to it.
 void Spawn(Function fn, void* arg, void* status = nullptr);
