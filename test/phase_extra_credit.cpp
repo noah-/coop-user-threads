@@ -2,14 +2,38 @@
 #include <atomic>
 #include <thread>
 #include <vector>
+#include <mutex>
+#include <pthread.h>
+#include "common.h"
+
+struct Race {
+  uint32_t count;
+
+  Race() { 
+    count = 0xdeadbeef;
+  }
+};
+
+static Race *race = NULL;
+
+void Create(void*) {
+  race = new Race();
+}
+
+void Ready(void*) {
+  if (race) {
+     ASSERT(race->count == 0xdeadbeef);
+  }
+}
 
 constexpr int const kKernelThreads = 50;
 
-void GreenThreadWorker(void*) { printf("Green thread on kernel thread.\n"); }
-
 void KernelThreadWorker(int n) {
   chloros::Initialize();
-  chloros::Spawn(GreenThreadWorker, nullptr);
+  if (n%2 == 0)
+    chloros::Spawn(Create, nullptr);
+  else
+    chloros::Spawn(Ready, nullptr);
   chloros::Wait();
   printf("Finished thread %d.\n", n);
 }
@@ -23,4 +47,4 @@ int main() {
     threads[i].join();
   }
   return 0;
-}
+} 
