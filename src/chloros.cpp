@@ -126,13 +126,14 @@ void Spawn(Function fn, void* arg) {
 
   thread_queue.insert(thread_queue.begin(), std::move(new_thread));
 
-  queue_lock.unlock(); // End Exclusive Section
+//  queue_lock.unlock(); // End Exclusive Section
 
-  Yield(true);
+  Yield(true, true);
 }
 
-bool Yield(bool only_ready) {
-  queue_lock.lock(); // Start Exclusive Section
+bool Yield(bool only_ready, bool lock_held) {
+  if (!lock_held)
+    queue_lock.lock(); // Start Exclusive Section
 
   Context* old_context = &current_thread->context;
   auto next_thread = std::unique_ptr<Thread>{nullptr};

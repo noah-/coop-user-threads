@@ -88,7 +88,7 @@ void Spawn(Function fn, void* arg);
 // initial threads that are stuck in `Wait()`, it will loop forever. Again, you
 // will have multiple initial threads only in the extra credit phase where you
 // have multiple kernel threads. So you could ignore this for now.
-bool Yield(bool only_ready = false) __attribute__((noinline));
+bool Yield(bool only_ready = false, bool lock_held = false) __attribute__((noinline));
 
 // Wait till all other green threads are done. Call this only from initial
 // threads. It will wait for ready threads but not other waiting threads.
