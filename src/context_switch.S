@@ -36,7 +36,7 @@ context_switch:
   movq 40(%rsi), %rbx
   movq 48(%rsi), %rbp
 
-  jmp queue_unlock
+  ret
 
 /**
  * Initial function implicitly executed by a thread.

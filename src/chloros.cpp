@@ -125,9 +125,6 @@ void Spawn(Function fn, void* arg) {
   queue_lock.lock(); // Start Exclusive Section
 
   thread_queue.insert(thread_queue.begin(), std::move(new_thread));
-
-//  queue_lock.unlock(); // End Exclusive Section
-
   Yield(true, true);
 }
 
@@ -161,6 +158,9 @@ bool Yield(bool only_ready, bool lock_held) {
   }
 
   current_thread = std::move(next_thread);
+  current_thread->context.rsp -= sizeof(uint64_t*);
+  *(uint64_t*)(current_thread->context.rsp) = reinterpret_cast<uint64_t>(QueueUnlock);
+
   ContextSwitch(old_context, &current_thread.get()->context); // End Exclusive Section
 
   GarbageCollect();
