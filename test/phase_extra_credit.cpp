@@ -26,7 +26,7 @@ void Ready(void*) {
   }
 }
 
-constexpr int const kKernelThreads = 50;
+constexpr int const kKernelThreads = 2;
 
 void KernelThreadWorker(int n) {
   chloros::Initialize();
@@ -46,5 +46,9 @@ int main() {
   for (int i = 0; i < kKernelThreads; ++i) {
     threads[i].join();
   }
+
+  if (race)
+    delete race;
+
   return 0;
 } 
