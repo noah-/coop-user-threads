@@ -23,6 +23,7 @@ void Create(void*) {
 void Ready(void*) {
   if (race) {
      ASSERT(race->count == 0xdeadbeef);
+     return;
   }
 
   std::lock_guard<std::mutex> lock{race_lock};
