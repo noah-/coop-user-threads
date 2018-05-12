@@ -1,9 +1,7 @@
 #include <chloros.h>
-#include <atomic>
 #include <thread>
 #include <vector>
 #include <mutex>
-#include <pthread.h>
 #include "common.h"
 
 struct Race {
@@ -15,24 +13,29 @@ struct Race {
 };
 
 static Race *race = NULL;
+std::mutex race_lock{};
 
 void Create(void*) {
   race = new Race();
+  race_lock.unlock();
 }
 
 void Ready(void*) {
   if (race) {
      ASSERT(race->count == 0xdeadbeef);
+     return;
   }
-}
 
-constexpr int const kKernelThreads = 2;
+  std::lock_guard<std::mutex> lock{race_lock};
+  ASSERT(race->count == 0xdeadbeef);
+}
 
 void KernelThreadWorker(int n) {
   chloros::Initialize();
-  if (n%2 == 0)
+  if (n == 0) {
+    race_lock.lock();
     chloros::Spawn(Create, nullptr);
-  else
+  } else
     chloros::Spawn(Ready, nullptr);
   chloros::Wait();
   printf("Finished thread %d.\n", n);
@@ -40,12 +43,10 @@ void KernelThreadWorker(int n) {
 
 int main() {
   std::vector<std::thread> threads{};
-  for (int i = 0; i < kKernelThreads; ++i) {
-    threads.emplace_back(KernelThreadWorker, i);
-  }
-  for (int i = 0; i < kKernelThreads; ++i) {
-    threads[i].join();
-  }
+  threads.emplace_back(KernelThreadWorker, 0);
+  threads.emplace_back(KernelThreadWorker, 1);
+  threads[0].join();
+  threads[1].join();
 
   if (race)
     delete race;
